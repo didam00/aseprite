@@ -1,0 +1,51 @@
+name: build
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [RelWithDebInfo]
+        ui: [gui]
+        scripting: [lua]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install Skia
+      shell: bash
+      run: |
+        this_dir=$(cygpath "${{ github.workspace }}")
+        skia_url=$(source $this_dir/laf/misc/skia-url.sh | xargs)
+        skia_file=$(basename $skia_url)
+        curl --ssl-revoke-best-effort -L -o "$skia_file" "$skia_url"
+        unzip "$skia_file" -d skia
+
+    - uses: aseprite/get-ninja@main
+    - uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Generating Makefiles
+      shell: bash
+      run: |
+        cmake -S . -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DENABLE_TESTS=OFF \
+          -DENABLE_SCRIPTING=on \
+          -DLAF_BACKEND=skia \
+          -DSKIA_DIR=$(realpath skia) \
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-x64)
+
+    - name: Compiling
+      shell: bash
+      run: |
+        cd build && ninja aseprite
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Aseprite-Windows-Full-Bundle
+        # 빌드 폴더 내의 bin 폴더 전체를 가져오면 CLI와 GUI 모두 완벽하게 작동합니다.
+        path: build/bin/
