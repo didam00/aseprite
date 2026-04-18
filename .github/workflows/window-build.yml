@@ -1,5 +1,5 @@
-name: build
-on: [push, pull_request, workflow_dispatch]
+name: window-build
+on: [workflow_dispatch]
 jobs:
   build:
     runs-on: windows-latest
@@ -34,6 +34,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DENABLE_TESTS=OFF \
           -DENABLE_SCRIPTING=on \
+          -DENABLE_UPDATER=OFF \
           -DLAF_BACKEND=skia \
           -DSKIA_DIR=$(realpath skia) \
           -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-x64)
@@ -43,9 +44,15 @@ jobs:
       run: |
         cd build && ninja aseprite
 
+    - name: Prepare Bundle
+      shell: bash
+      run: |
+        mkdir -p bundle
+        cp -r build/bin/* bundle
+
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Aseprite-Windows-Full-Bundle
-        # 빌드 폴더 내의 bin 폴더 전체를 가져오면 CLI와 GUI 모두 완벽하게 작동합니다.
-        path: build/bin/
+        name: compiled-aseprite
+        path: bundle/
